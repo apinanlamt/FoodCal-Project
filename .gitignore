@@ -1,0 +1,9 @@
+.env
+foodcal.db
+data/*.db
+data/*.db-shm
+data/*.db-wal
+*.db-shm
+*.db-wal
+__pycache__/
+.venv/

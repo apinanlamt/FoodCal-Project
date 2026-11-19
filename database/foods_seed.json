@@ -1,0 +1,38 @@
+[
+  {
+    "food_key": "white_rice",
+    "name": "ข้าวสวย",
+    "calories_kcal": 130,
+    "protein_g": 2.7,
+    "carbs_g": 28.2,
+    "fat_g": 0.3,
+    "aliases": "ข้าว,white rice,steamed rice"
+  },
+  {
+    "food_key": "fried_rice",
+    "name": "ข้าวผัด",
+    "calories_kcal": 180,
+    "protein_g": 4.5,
+    "carbs_g": 26,
+    "fat_g": 6.2,
+    "aliases": "ข้าวผัดไข่,fried rice"
+  },
+  {
+    "food_key": "pad_thai",
+    "name": "ผัดไทย",
+    "calories_kcal": 180,
+    "protein_g": 7.5,
+    "carbs_g": 25,
+    "fat_g": 5.5,
+    "aliases": "ผัดไท,pad thai"
+  },
+  {
+    "food_key": "green_curry",
+    "name": "แกงเขียวหวาน",
+    "calories_kcal": 130,
+    "protein_g": 6,
+    "carbs_g": 7,
+    "fat_g": 8.5,
+    "aliases": "แกงเขียวหวานไก่,green curry"
+  }
+]
