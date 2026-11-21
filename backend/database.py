@@ -198,6 +198,24 @@ def initialize_database() -> None:
             }
         )
         seed_foods_by_key[food_key] = food_seed
+
+    thai_nutrition_path = PROJECT_ROOT / "backend" / "model" / "thfood50_nutrition.json"
+    with thai_nutrition_path.open(encoding="utf-8") as nutrition_file:
+        thai_nutrition_data = json.load(nutrition_file)
+    for food_key, item in thai_nutrition_data["foods"].items():
+        serving_g = float(item["serving_g"])
+        if serving_g <= 0:
+            raise ValueError(f"Invalid serving size in thfood50_nutrition.json for {food_key}")
+        factor = 100 / serving_g
+        seed_foods_by_key[food_key] = {
+            "food_key": food_key,
+            "name": item["name"],
+            "aliases": ",".join(item.get("aliases", [])),
+            "calories_kcal": float(item["kcal_per_serving"]) * factor,
+            "protein_g": float(item["protein_g_per_serving"]) * factor,
+            "carbs_g": float(item["carbs_g_per_serving"]) * factor,
+            "fat_g": float(item["fat_g_per_serving"]) * factor,
+        }
     seed_foods = list(seed_foods_by_key.values())
     with SessionLocal() as session:
         for item in seed_foods:

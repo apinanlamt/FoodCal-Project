@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from backend.auth import create_access_token, decode_access_token, hash_password, verify_password
 from backend.database import Food, Meal, User, get_session, initialize_database
 from backend.demo_accounts import DEMO_USERS, demo_login_enabled
-from backend.inference import ModelNotReadyError, model_availability, model_info, predict_food
+from backend.inference import ModelNotReadyError, model_availability, model_info, predict_food, predict_food_auto
 
 
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
@@ -28,6 +28,9 @@ Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 with (PROJECT_ROOT / "backend" / "model" / "usda_fndds_mappings.json").open(encoding="utf-8") as nutrition_file:
     NUTRITION_REFERENCE = json.load(nutrition_file)
+with (PROJECT_ROOT / "backend" / "model" / "thfood50_nutrition.json").open(encoding="utf-8") as nutrition_file:
+    THFOOD50_NUTRITION = json.load(nutrition_file)
+THFOOD50_LABEL_MAP = THFOOD50_NUTRITION["class_to_food_key"]
 
 
 @asynccontextmanager
@@ -174,6 +177,21 @@ def _nutrition(food: Food, servings_g: float) -> dict[str, float | None]:
 
 
 def _nutrition_source(food_key: str) -> dict[str, object]:
+    thai_food_key = THFOOD50_LABEL_MAP.get(food_key, food_key)
+    thai_item = THFOOD50_NUTRITION["foods"].get(thai_food_key)
+    if thai_item:
+        metadata = THFOOD50_NUTRITION["_meta"]
+        return {
+            "source": metadata["source"],
+            "source_item": metadata["source_item"],
+            "data_type": metadata["data_type"],
+            "release_date": metadata["release_date"],
+            "reference_serving": f"{thai_item['serving_g']:g} g serving",
+            "reference_serving_g": thai_item["serving_g"],
+            "match_quality": thai_item["match_quality"],
+            "match_note": thai_item["match_note"],
+            "verified": thai_item["match_quality"] == "direct",
+        }
     if food_key == "PadThai":
         food_key = "pad_thai"
     item = NUTRITION_REFERENCE.get(food_key, {})
@@ -204,10 +222,8 @@ def _food_for_label(db: Session, label: str) -> Food | None:
 
 
 def _nutrition_lookup_label(model_name: str, label: str) -> str:
-    # Only map a Thai class when the existing nutrition database has a matching
-    # sourced entry. Other Thai predictions remain classification-only.
-    if model_name == "thfood50" and label == "PadThai":
-        return "pad_thai"
+    if model_name == "thfood50":
+        return THFOOD50_LABEL_MAP.get(label, label)
     return label
 
 
@@ -245,7 +261,7 @@ def list_foods(
 def predict(
     file: Annotated[UploadFile, File(description="Food image (JPEG, PNG or WebP)")],
     servings_g: Annotated[float, Form(gt=0, le=2000)] = 250,
-    model_name: Annotated[str, Form()] = "food101",
+    model_name: Annotated[str, Form()] = "auto",
     db: Session = Depends(get_session),
     _: User = Depends(get_current_user),
 ) -> dict[str, object]:
@@ -267,8 +283,14 @@ def predict(
         raise HTTPException(status_code=400, detail="ไม่สามารถอ่านไฟล์รูปภาพนี้ได้") from None
 
     try:
+        if model_name == "auto":
+            model_name, label, confidence, top_predictions, selection_reason = predict_food_auto(image)
+            selection_mode = "automatic"
+        else:
+            selection_reason = "เลือกโมเดลโดยผู้ใช้"
+            selection_mode = "manual"
+            label, confidence, top_predictions = predict_food(image, model_name)
         info = model_info(model_name)
-        label, confidence, top_predictions = predict_food(image, model_name)
     except ModelNotReadyError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
 
@@ -286,6 +308,8 @@ def predict(
     return {
         "model": model_name,
         **info,
+        "selection_mode": selection_mode,
+        "selection_reason": selection_reason,
         "predicted_label": label,
         "food_id": food.id if food else None,
         "food_name": food.name if food else _display_label(label),
@@ -293,6 +317,12 @@ def predict(
         "top_predictions": ranked_predictions,
         "servings_g": round(servings_g, 1),
         "nutrition": nutrition,
+        "nutrition_per_100g": {
+            "calories_kcal": food.calories_kcal,
+            "protein_g": food.protein_g,
+            "carbs_g": food.carbs_g,
+            "fat_g": food.fat_g,
+        } if food else None,
         "nutrition_source": _nutrition_source(nutrition_label),
     }
 

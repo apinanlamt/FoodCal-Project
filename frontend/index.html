@@ -26,7 +26,7 @@
         <div class="hero-copy">
           <p class="eyebrow"><span></span> EAT WELL, FEEL WELL</p>
           <h1>ทุกจานมีเรื่องราว<br />ให้เรา<span>เข้าใจ</span></h1>
-          <p class="hero-description">ถ่ายรูปหรือเลือกรูปอาหาร แล้วให้ FoodCal ช่วยประเมินแคลอรีและสารอาหารในจานของคุณ</p>
+          <p class="hero-description">เลือกรูปอาหาร แล้วให้ FoodCal ช่วยประเมินแคลอรีและสารอาหารในจานของคุณ</p>
           <a class="text-link" href="#analyze">เริ่มวิเคราะห์ <span aria-hidden="true">↘</span></a>
         </div>
         <div class="hero-art" aria-hidden="true">
@@ -57,29 +57,29 @@
       <section id="analyze" class="workspace" hidden>
         <div class="section-heading">
           <div><p class="eyebrow">YOUR PLATE, DECODED</p><h2>เริ่มจากจานนี้</h2></div>
-          <p>เลือกชุดอาหารให้ตรงกับรูปก่อนวิเคราะห์ · แต่ละโมเดลจำแนกได้เฉพาะคลาสในชุดของตัวเอง<br />ภาพชัดและเห็นอาหารทั้งจานช่วยให้จำแนกได้ดีขึ้น</p>
+          <p>ระบบจะเลือกโมเดลที่เหมาะกับรูปให้อัตโนมัติ<br />ภาพชัดและเห็นอาหารทั้งจานช่วยให้จำแนกได้ดีขึ้น</p>
         </div>
         <div class="analyzer-grid">
           <section class="upload-card" aria-label="อัปโหลดรูปอาหาร">
             <div class="upload-topline"><span class="step-number">01</span><span>เพิ่มรูปอาหาร</span></div>
             <label id="drop-zone" class="drop-zone" for="photo-input">
               <img id="image-preview" alt="ตัวอย่างรูปอาหารที่เลือก" hidden />
+              <span id="image-scan" class="image-scan" aria-hidden="true" hidden></span>
               <span id="upload-placeholder" class="upload-placeholder"><span class="upload-icon">↑</span><strong>วางรูปตรงนี้ หรือเลือกจากเครื่อง</strong><small>รองรับ JPG, PNG, WEBP · ไม่เกิน 8 MB</small></span>
             </label>
-            <input id="photo-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden />
-            <div class="upload-actions"><button id="choose-button" class="button button-secondary" type="button">เลือกรูปภาพ</button><button id="camera-button" class="button button-primary" type="button">เปิดกล้อง <span aria-hidden="true">↗</span></button></div>
-            <div id="camera-panel" class="camera-panel" hidden>
-              <div class="camera-toolbar">
-                <label for="camera-device">เลือกกล้อง</label>
-                <select id="camera-device" aria-label="เลือกอุปกรณ์กล้อง"></select>
-                <button id="close-camera-button" class="camera-close" type="button" aria-label="ปิดกล้อง">ปิด</button>
-              </div>
-              <video id="camera-video" autoplay muted playsinline aria-label="ภาพสดจากกล้อง"></video>
-              <button id="capture-button" class="button button-primary camera-capture" type="button">ถ่ายภาพ</button>
-            </div>
-            <div class="classifier-row"><label for="classifier-select">ชุดอาหารที่ต้องการวิเคราะห์</label><select id="classifier-select"><option value="food101">อาหารสากล · Food-101 (101 คลาส)</option><option value="thfood50">อาหารไทย · THFOOD-50 (50 คลาส)</option></select><small>เลือกโมเดลให้ตรงกับชนิดอาหารในภาพ</small></div>
-            <div class="serving-row"><label for="serving-input">ปริมาณโดยประมาณ</label><div class="serving-control"><input id="serving-input" type="number" min="1" max="2000" step="10" value="250" /><span>กรัม</span></div></div>
+            <input id="photo-input" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+            <div class="upload-actions"><button id="choose-button" class="button button-primary" type="button">เลือกรูปภาพจากเครื่อง</button></div>
+            <div class="serving-row"><label for="serving-input">ปริมาณโดยประมาณ</label><div class="serving-control"><button id="serving-decrease" type="button" aria-label="ลดปริมาณอาหาร">−</button><input id="serving-input" type="number" min="1" max="2000" step="1" value="250" /><button id="serving-increase" type="button" aria-label="เพิ่มปริมาณอาหาร">+</button><span>กรัม</span></div></div>
+            <div class="serving-slider-row"><input id="serving-slider" type="range" min="1" max="2000" step="1" value="250" aria-label="เลื่อนเพื่อปรับปริมาณอาหารเป็นกรัม" /><div><span>1 กรัม</span><output id="serving-output" for="serving-slider">250 กรัม</output><span>2,000 กรัม</span></div></div>
             <button id="analyze-button" class="button button-analyze" type="button" disabled>วิเคราะห์จานนี้ <span aria-hidden="true">→</span></button>
+            <div id="analysis-progress" class="analysis-progress" hidden aria-live="polite">
+              <div class="analysis-progress-track"><i id="analysis-progress-fill"></i></div>
+              <ol>
+                <li class="analysis-step"><span>1</span><b>เตรียมภาพ</b></li>
+                <li class="analysis-step"><span>2</span><b>จำแนกอาหาร</b></li>
+                <li class="analysis-step"><span>3</span><b>คำนวณโภชนาการ</b></li>
+              </ol>
+            </div>
             <p id="status-message" class="status-message" role="status" aria-live="polite">รูปที่อัปโหลดใช้ทำนายเท่านั้น ไม่ถูกบันทึก</p>
           </section>
 
@@ -107,6 +107,7 @@
 
       <section id="history" class="history-section" hidden>
         <div class="section-heading history-heading"><div><p class="eyebrow">A LITTLE PROGRESS, EVERY DAY</p><h2>บันทึกของคุณ</h2></div><span id="history-count" class="history-count">0 มื้อ</span></div>
+        <div id="weekly-summary" class="weekly-summary" aria-live="polite"></div>
         <div id="history-list" class="history-list"><p class="history-empty">มื้อที่บันทึกจะแสดงตรงนี้ เริ่มต้นจากการวิเคราะห์อาหารสักจานนะ</p></div>
       </section>
     </main>

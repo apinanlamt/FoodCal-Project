@@ -18,6 +18,10 @@ MODEL_IMAGE_SIZE = int(os.getenv("MODEL_IMAGE_SIZE", "224"))
 MODEL_RESIZE_SIZE = int(os.getenv("MODEL_RESIZE_SIZE", "256"))
 MODEL_MEAN = np.asarray([0.485, 0.456, 0.406], dtype=np.float32)
 MODEL_STD = np.asarray([0.229, 0.224, 0.225], dtype=np.float32)
+# Automatic routing uses THFOOD-50's own score and top-two margin. Scores from
+# Food-101 and THFOOD-50 are not calibrated against each other.
+THFOOD50_AUTO_MIN_CONFIDENCE = float(os.getenv("THFOOD50_AUTO_MIN_CONFIDENCE", "0.50"))
+THFOOD50_AUTO_MIN_MARGIN = float(os.getenv("THFOOD50_AUTO_MIN_MARGIN", "0.10"))
 
 MODEL_SPECS = {
     "food101": {
@@ -123,3 +127,35 @@ def predict_food(image: Image.Image, model_name: str = "food101") -> tuple[str, 
         return label, score, top_predictions
     except Exception as error:
         raise ModelNotReadyError(f"ประมวลผลรูปด้วย ONNX model ไม่สำเร็จ: {error}") from error
+
+
+def predict_food_auto(
+    image: Image.Image,
+) -> tuple[str, str, float, list[tuple[str, float]], str]:
+    """Run available classifiers and route to a model using a conservative THFOOD gate."""
+    available = [name for name in MODEL_SPECS if MODEL_SPECS[name]["path"].is_file() and MODEL_SPECS[name]["classes_path"].is_file()]
+    if not available:
+        raise ModelNotReadyError("ไม่พบไฟล์โมเดลและรายชื่อคลาสของ Food-101 หรือ THFOOD-50")
+
+    predictions: dict[str, tuple[str, float, list[tuple[str, float]]]] = {}
+    failures: list[str] = []
+    for model_name in available:
+        try:
+            predictions[model_name] = predict_food(image, model_name)
+        except ModelNotReadyError as error:
+            failures.append(f"{MODEL_SPECS[model_name]['name']}: {error}")
+
+    if not predictions:
+        raise ModelNotReadyError("โหลดโมเดลที่มีอยู่ไม่สำเร็จ: " + "; ".join(failures))
+
+    if len(predictions) == 1:
+        model_name, (label, confidence, top_predictions) = next(iter(predictions.items()))
+        return model_name, label, confidence, top_predictions, "ใช้โมเดลที่พร้อมใช้งาน"
+
+    thai_label, thai_confidence, thai_predictions = predictions["thfood50"]
+    thai_margin = thai_confidence - (thai_predictions[1][1] if len(thai_predictions) > 1 else 0.0)
+    if thai_confidence >= THFOOD50_AUTO_MIN_CONFIDENCE and thai_margin >= THFOOD50_AUTO_MIN_MARGIN:
+        return "thfood50", thai_label, thai_confidence, thai_predictions, "THFOOD-50 ผ่านเกณฑ์คัดเลือกอัตโนมัติ"
+
+    label, confidence, top_predictions = predictions["food101"]
+    return "food101", label, confidence, top_predictions, "THFOOD-50 ไม่ผ่านเกณฑ์ จึงใช้ Food-101"
