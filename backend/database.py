@@ -5,9 +5,8 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generator
-from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, create_engine, select, text
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, create_engine, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 
@@ -45,23 +44,10 @@ class Food(Base):
     aliases: Mapped[str] = mapped_column(String(500), default="")
 
 
-class User(Base):
-    __tablename__ = "users"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    email: Mapped[str] = mapped_column(String(254), unique=True, index=True)
-    display_name: Mapped[str] = mapped_column(String(120))
-    password_hash: Mapped[str] = mapped_column(String(300))
-    role: Mapped[str] = mapped_column(String(20), default="user")
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-
-
 class Meal(Base):
     __tablename__ = "meals"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     food_id: Mapped[int] = mapped_column(ForeignKey("foods.id"))
     food_name: Mapped[str] = mapped_column(String(160))
     predicted_label: Mapped[str] = mapped_column(String(160))
@@ -83,7 +69,7 @@ def get_session() -> Generator[Session, None, None]:
 
 
 def _make_macro_columns_nullable() -> None:
-    """Allow calorie-only foods while preserving existing local account/history data."""
+    """Allow calorie-only foods while preserving saved meal records."""
     columns = ("protein_g", "carbs_g", "fat_g")
     if engine.dialect.name == "postgresql":
         with engine.begin() as connection:
@@ -125,7 +111,6 @@ def _make_macro_columns_nullable() -> None:
         cursor.execute(
             """CREATE TABLE meals__nullable (
                 id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-                owner_id VARCHAR(36) NOT NULL,
                 food_id INTEGER NOT NULL,
                 food_name VARCHAR(160) NOT NULL,
                 predicted_label VARCHAR(160) NOT NULL,
@@ -136,13 +121,12 @@ def _make_macro_columns_nullable() -> None:
                 carbs_g FLOAT,
                 fat_g FLOAT,
                 created_at DATETIME NOT NULL,
-                FOREIGN KEY(owner_id) REFERENCES users (id),
                 FOREIGN KEY(food_id) REFERENCES foods (id)
             )"""
         )
         cursor.execute(
             """INSERT INTO meals__nullable
-               SELECT id, owner_id, food_id, food_name, predicted_label, confidence, servings_g,
+               SELECT id, food_id, food_name, predicted_label, confidence, servings_g,
                       calories_kcal, protein_g, carbs_g, fat_g, created_at FROM meals"""
         )
         cursor.execute("DROP TABLE meals")
@@ -150,7 +134,6 @@ def _make_macro_columns_nullable() -> None:
         cursor.execute("ALTER TABLE foods__nullable RENAME TO foods")
         cursor.execute("ALTER TABLE meals__nullable RENAME TO meals")
         cursor.execute("CREATE UNIQUE INDEX ix_foods_food_key ON foods (food_key)")
-        cursor.execute("CREATE INDEX ix_meals_owner_id ON meals (owner_id)")
         cursor.execute("CREATE INDEX ix_meals_created_at ON meals (created_at)")
         connection.commit()
         cursor.execute("PRAGMA foreign_keys=ON")
@@ -161,9 +144,73 @@ def _make_macro_columns_nullable() -> None:
         connection.close()
 
 
+def _remove_login_schema() -> None:
+    """Drop account linkage while preserving every saved meal."""
+    if engine.dialect.name == "sqlite":
+        connection = engine.raw_connection()
+        try:
+            cursor = connection.cursor()
+            columns = {row[1] for row in cursor.execute("PRAGMA table_info(meals)").fetchall()}
+            has_users = cursor.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'"
+            ).fetchone() is not None
+            if "owner_id" not in columns and not has_users:
+                return
+
+            cursor.execute("PRAGMA foreign_keys=OFF")
+            cursor.execute("BEGIN")
+            if "owner_id" in columns:
+                cursor.execute(
+                    """CREATE TABLE meals__no_login (
+                        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        food_id INTEGER NOT NULL,
+                        food_name VARCHAR(160) NOT NULL,
+                        predicted_label VARCHAR(160) NOT NULL,
+                        confidence FLOAT NOT NULL,
+                        servings_g FLOAT NOT NULL,
+                        calories_kcal FLOAT NOT NULL,
+                        protein_g FLOAT,
+                        carbs_g FLOAT,
+                        fat_g FLOAT,
+                        created_at DATETIME NOT NULL,
+                        FOREIGN KEY(food_id) REFERENCES foods (id)
+                    )"""
+                )
+                cursor.execute(
+                    """INSERT INTO meals__no_login
+                       SELECT id, food_id, food_name, predicted_label, confidence, servings_g,
+                              calories_kcal, protein_g, carbs_g, fat_g, created_at FROM meals"""
+                )
+                cursor.execute("DROP TABLE meals")
+                cursor.execute("ALTER TABLE meals__no_login RENAME TO meals")
+                cursor.execute("CREATE INDEX ix_meals_created_at ON meals (created_at)")
+            if has_users:
+                cursor.execute("DROP TABLE users")
+            connection.commit()
+            cursor.execute("PRAGMA foreign_keys=ON")
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+        return
+
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as connection:
+            meal_columns = {column["name"] for column in inspect(connection).get_columns("meals")}
+            if "owner_id" in meal_columns:
+                connection.execute(text("ALTER TABLE meals DROP COLUMN owner_id"))
+            if inspect(connection).has_table("users"):
+                connection.execute(text("DROP TABLE users"))
+        return
+
+    raise RuntimeError(f"Unsupported database dialect for login removal: {engine.dialect.name}")
+
+
 def initialize_database() -> None:
     Base.metadata.create_all(engine)
     _make_macro_columns_nullable()
+    _remove_login_schema()
     seed_path = PROJECT_ROOT / "database" / "foods_seed.json"
     with seed_path.open(encoding="utf-8") as seed_file:
         seed_foods = json.load(seed_file)
@@ -230,23 +277,3 @@ def initialize_database() -> None:
                 food.fat_g = item["fat_g"]
                 food.aliases = item["aliases"]
         session.commit()
-
-    from backend.auth import hash_password
-    from backend.demo_accounts import DEMO_USERS, demo_login_enabled
-
-    if demo_login_enabled():
-        with SessionLocal() as session:
-            for demo_user in DEMO_USERS:
-                exists = session.scalar(select(User.id).where(User.email == demo_user["email"]))
-                if exists is None:
-                    session.add(
-                        User(
-                            id=str(uuid4()),
-                            email=demo_user["email"],
-                            display_name=demo_user["display_name"],
-                            password_hash=hash_password(demo_user["password"]),
-                            role="user",
-                            is_active=True,
-                        )
-                    )
-            session.commit()

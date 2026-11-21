@@ -7,18 +7,15 @@ from contextlib import asynccontextmanager
 from io import BytesIO
 from pathlib import Path
 from typing import Annotated
-from uuid import uuid4
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.auth import create_access_token, decode_access_token, hash_password, verify_password
-from backend.database import Food, Meal, User, get_session, initialize_database
-from backend.demo_accounts import DEMO_USERS, demo_login_enabled
+from backend.database import Food, Meal, get_session, initialize_database
 from backend.inference import ModelNotReadyError, model_availability, model_info, predict_food, predict_food_auto
 
 
@@ -35,16 +32,13 @@ THFOOD50_LABEL_MAP = THFOOD50_NUTRITION["class_to_food_key"]
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    from backend.auth import get_jwt_secret
-
-    get_jwt_secret()
     initialize_database()
     yield
 
 
 app = FastAPI(
     title="FoodCal API",
-    description="Food image classification, local account authentication, approximate nutrition and meal history.",
+    description="Food image classification, approximate nutrition and meal history.",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -55,7 +49,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=False,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Content-Type"],
 )
 
 
@@ -64,106 +58,6 @@ class CreateMealRequest(BaseModel):
     servings_g: float = Field(gt=0, le=2000)
     confidence: float = Field(ge=0, le=1)
     predicted_label: str = Field(min_length=1, max_length=160)
-
-
-class LoginRequest(BaseModel):
-    email: str = Field(min_length=3, max_length=254)
-    password: str = Field(min_length=1, max_length=256)
-
-
-class CreateUserRequest(BaseModel):
-    email: str = Field(min_length=3, max_length=254)
-    display_name: str = Field(min_length=1, max_length=120)
-    password: str = Field(min_length=12, max_length=256)
-
-
-def _normalize_email(email: str) -> str:
-    normalized = email.strip().casefold()
-    if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", normalized):
-        raise HTTPException(status_code=422, detail="กรุณาระบุอีเมลให้ถูกต้อง")
-    return normalized
-
-
-def _user_response(user: User) -> dict[str, str]:
-    return {"id": user.id, "email": user.email, "display_name": user.display_name, "role": user.role}
-
-
-def get_current_user(
-    authorization: Annotated[str | None, Header()] = None,
-    db: Session = Depends(get_session),
-) -> User:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="กรุณาเข้าสู่ระบบก่อนใช้งาน")
-    claims = decode_access_token(authorization.removeprefix("Bearer ").strip())
-    if not claims or not isinstance(claims.get("sub"), str):
-        raise HTTPException(status_code=401, detail="เซสชันหมดอายุหรือไม่ถูกต้อง กรุณาเข้าสู่ระบบใหม่")
-    user = db.get(User, claims["sub"])
-    if user is None or not user.is_active:
-        raise HTTPException(status_code=401, detail="บัญชีนี้ไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแลระบบ")
-    return user
-
-
-def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="เฉพาะผู้ดูแลระบบเท่านั้นที่ทำรายการนี้ได้")
-    return current_user
-
-
-@app.get("/api/auth/demo-users")
-def get_demo_users() -> list[dict[str, str]]:
-    if not demo_login_enabled():
-        raise HTTPException(status_code=404, detail="ไม่เปิดบัญชีทดลอง")
-    return [
-        {
-            "email": user["email"],
-            "display_name": user["display_name"],
-            "password": user["password"],
-        }
-        for user in DEMO_USERS
-    ]
-
-
-@app.post("/api/auth/login")
-def login(payload: LoginRequest, db: Session = Depends(get_session)) -> dict[str, object]:
-    email = _normalize_email(payload.email)
-    user = db.scalar(select(User).where(User.email == email))
-    if user is None or not user.is_active or not verify_password(user.password_hash, payload.password):
-        raise HTTPException(status_code=401, detail="อีเมลหรือรหัสผ่านไม่ถูกต้อง")
-    return {
-        "access_token": create_access_token(user.id, user.role),
-        "token_type": "bearer",
-        "expires_in": 12 * 60 * 60,
-        "user": _user_response(user),
-    }
-
-
-@app.get("/api/auth/me")
-def current_account(current_user: User = Depends(get_current_user)) -> dict[str, str]:
-    return _user_response(current_user)
-
-
-@app.post("/api/auth/users", status_code=201)
-def create_user(
-    payload: CreateUserRequest,
-    _: User = Depends(require_admin),
-    db: Session = Depends(get_session),
-) -> dict[str, str]:
-    email = _normalize_email(payload.email)
-    existing_user = db.scalar(select(User.id).where(User.email == email))
-    if existing_user:
-        raise HTTPException(status_code=409, detail="อีเมลนี้มีบัญชีอยู่แล้ว")
-    user = User(
-        id=str(uuid4()),
-        email=email,
-        display_name=payload.display_name.strip(),
-        password_hash=hash_password(payload.password),
-        role="user",
-        is_active=True,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return _user_response(user)
 
 
 def _nutrition(food: Food, servings_g: float) -> dict[str, float | None]:
@@ -263,7 +157,6 @@ def predict(
     servings_g: Annotated[float, Form(gt=0, le=2000)] = 250,
     model_name: Annotated[str, Form()] = "auto",
     db: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
 ) -> dict[str, object]:
     if file.content_type and not file.content_type.startswith("image/"):
         raise HTTPException(status_code=415, detail="ไฟล์ที่ส่งมาต้องเป็นรูปภาพ")
@@ -330,7 +223,6 @@ def predict(
 @app.post("/api/meals", status_code=201)
 def create_meal(
     payload: CreateMealRequest,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session),
 ) -> dict[str, object]:
     food = db.get(Food, payload.food_id)
@@ -338,7 +230,6 @@ def create_meal(
         raise HTTPException(status_code=404, detail="ไม่พบอาหารในฐานข้อมูล")
     nutrition = _nutrition(food, payload.servings_g)
     meal = Meal(
-        owner_id=current_user.id,
         food_id=food.id,
         food_name=food.name,
         predicted_label=payload.predicted_label,
@@ -370,12 +261,10 @@ def _meal_response(meal: Meal) -> dict[str, object]:
 
 @app.get("/api/meals")
 def list_meals(
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session),
 ) -> list[dict[str, object]]:
     meals = db.scalars(
         select(Meal)
-        .where(Meal.owner_id == current_user.id)
         .order_by(Meal.created_at.desc(), Meal.id.desc())
         .limit(100)
     ).all()
@@ -385,10 +274,9 @@ def list_meals(
 @app.delete("/api/meals/{meal_id}", status_code=204)
 def delete_meal(
     meal_id: int,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session),
 ) -> None:
-    meal = db.scalar(select(Meal).where(Meal.id == meal_id, Meal.owner_id == current_user.id))
+    meal = db.get(Meal, meal_id)
     if meal is None:
         raise HTTPException(status_code=404, detail="ไม่พบรายการมื้อนี้")
     db.delete(meal)

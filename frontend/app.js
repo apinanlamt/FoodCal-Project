@@ -7,11 +7,6 @@
   const analyzeButton = document.querySelector("#analyze-button");
   const statusMessage = document.querySelector("#status-message");
   const dropZone = document.querySelector("#drop-zone");
-  const authMessage = document.querySelector("#auth-message");
-  const authForm = document.querySelector("#auth-form");
-  const createUserForm = document.querySelector("#create-user-form");
-  const demoLoginPanel = document.querySelector("#demo-login-panel");
-  const demoLoginList = document.querySelector("#demo-login-list");
   const servingInput = document.querySelector("#serving-input");
   const servingSlider = document.querySelector("#serving-slider");
   const servingOutput = document.querySelector("#serving-output");
@@ -20,21 +15,13 @@
   let selectedFile = null;
   let currentResult = null;
   let previewUrl = null;
-  let session = null;
-  let activeUserId = null;
   let analysisProgressTimer = null;
   let analysisHideTimer = null;
 
   async function request(path, options = {}) {
-    const headers = new Headers(options.headers || {});
-    if (session?.access_token) headers.set("Authorization", `Bearer ${session.access_token}`);
-    const response = await fetch(`${apiBase}${path}`, { ...options, headers });
+    const response = await fetch(`${apiBase}${path}`, options);
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      if (response.status === 401 && session) {
-        sessionStorage.removeItem("foodcal-access-token");
-        applySession(null);
-      }
       const detail = typeof data.detail === "string" ? data.detail : "เกิดข้อผิดพลาด โปรดลองอีกครั้ง";
       const error = new Error(detail);
       error.status = response.status;
@@ -46,162 +33,6 @@
   function setStatus(message, kind = "") {
     statusMessage.textContent = message;
     statusMessage.className = `status-message ${kind}`.trim();
-  }
-
-  function setAuthMessage(message, kind = "") {
-    authMessage.textContent = message;
-    authMessage.className = `auth-message ${kind}`.trim();
-  }
-
-  function applySession(nextSession) {
-    const nextUserId = nextSession?.user?.id || null;
-    const userChanged = activeUserId !== nextUserId;
-    session = nextSession;
-    activeUserId = nextUserId;
-    document.querySelector("#signed-out-panel").hidden = Boolean(session);
-    document.querySelector("#signed-in-panel").hidden = !session;
-    document.querySelector("#analyze").hidden = !session;
-    document.querySelector("#history").hidden = !session;
-    document.querySelector("#admin-tools").hidden = session?.user?.role !== "admin";
-
-    if (userChanged) {
-      currentResult = null;
-      document.querySelector("#weekly-summary").innerHTML = "";
-      document.querySelector("#history-list").innerHTML = '<p class="history-empty">กำลังโหลดประวัติมื้อ…</p>';
-      document.querySelector("#history-count").textContent = "0 มื้อ";
-      selectedFile = null;
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      previewUrl = null;
-      preview.removeAttribute("src");
-      preview.hidden = true;
-      placeholder.hidden = false;
-      analyzeButton.disabled = true;
-      document.querySelector("#result-content").hidden = true;
-      document.querySelector("#empty-result").hidden = false;
-    }
-
-    if (session) {
-      document.querySelector("#account-email").textContent = session.user.display_name || session.user.email || "บัญชี FoodCal";
-      setAuthMessage("");
-      if (userChanged) loadHistory();
-    } else {
-      currentResult = null;
-      document.querySelector("#history-list").innerHTML = '<p class="history-empty">เข้าสู่ระบบเพื่อดูประวัติมื้อของคุณ</p>';
-      document.querySelector("#weekly-summary").innerHTML = "";
-      document.querySelector("#history-count").textContent = "0 มื้อ";
-      document.querySelector("#result-content").hidden = true;
-      document.querySelector("#empty-result").hidden = false;
-      setStatus("กรุณาเข้าสู่ระบบก่อนวิเคราะห์อาหาร");
-    }
-  }
-
-  authForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const submitButton = document.querySelector("#auth-submit");
-    const email = document.querySelector("#auth-email").value.trim();
-    const password = document.querySelector("#auth-password").value;
-    submitButton.disabled = true;
-    setAuthMessage("กำลังเข้าสู่ระบบ…");
-    try {
-      const result = await request("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      sessionStorage.setItem("foodcal-access-token", result.access_token);
-      applySession({ access_token: result.access_token, user: result.user });
-      authForm.reset();
-      setAuthMessage("เข้าสู่ระบบสำเร็จ", "success");
-    } catch (error) {
-      setAuthMessage(error.message || "ดำเนินการไม่สำเร็จ กรุณาลองอีกครั้ง", "error");
-    } finally {
-      submitButton.disabled = false;
-    }
-  });
-
-  document.querySelector("#signout-button").addEventListener("click", async () => {
-    sessionStorage.removeItem("foodcal-access-token");
-    applySession(null);
-  });
-
-  createUserForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const message = document.querySelector("#create-user-message");
-    const submitButton = createUserForm.querySelector("button[type='submit']");
-    submitButton.disabled = true;
-    message.textContent = "กำลังสร้างบัญชี…";
-    try {
-      const user = await request("/api/auth/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          display_name: document.querySelector("#new-user-name").value.trim(),
-          email: document.querySelector("#new-user-email").value.trim(),
-          password: document.querySelector("#new-user-password").value,
-        }),
-      });
-      message.textContent = `สร้างบัญชี ${user.email} แล้ว`;
-      message.className = "auth-message success";
-      createUserForm.reset();
-    } catch (error) {
-      message.textContent = error.message;
-      message.className = "auth-message error";
-    } finally {
-      submitButton.disabled = false;
-    }
-  });
-
-  async function restoreSession() {
-    const token = sessionStorage.getItem("foodcal-access-token");
-    if (!token) return;
-    session = { access_token: token };
-    try {
-      const user = await request("/api/auth/me");
-      applySession({ access_token: token, user });
-    } catch (error) {
-      if (error.status === 401) {
-        sessionStorage.removeItem("foodcal-access-token");
-      } else {
-        setAuthMessage("เชื่อมต่อ backend เพื่อคืนสถานะบัญชีไม่ได้ กรุณาลองรีเฟรชอีกครั้ง", "error");
-      }
-      applySession(null);
-    }
-  }
-
-  async function loadDemoUsers() {
-    try {
-      const users = await request("/api/auth/demo-users");
-      if (!Array.isArray(users) || users.length === 0) return;
-      demoLoginList.replaceChildren();
-      users.forEach((user) => {
-        const card = document.createElement("div");
-        card.className = "demo-login-card";
-        const details = document.createElement("div");
-        details.className = "demo-login-details";
-        const name = document.createElement("strong");
-        name.textContent = user.display_name;
-        const email = document.createElement("span");
-        email.textContent = user.email;
-        const password = document.createElement("span");
-        password.textContent = `รหัสผ่าน: ${user.password}`;
-        const button = document.createElement("button");
-        button.className = "demo-login-button";
-        button.type = "button";
-        button.textContent = "เข้าใช้";
-        button.addEventListener("click", () => {
-          document.querySelector("#auth-email").value = user.email;
-          document.querySelector("#auth-password").value = user.password;
-          authForm.requestSubmit();
-        });
-        details.append(name, email, password);
-        card.append(details, button);
-        demoLoginList.append(card);
-      });
-      demoLoginPanel.hidden = false;
-    } catch {
-      // The demo endpoint is intentionally disabled outside local demo mode.
-      demoLoginPanel.hidden = true;
-    }
   }
 
   function useFile(file) {
@@ -231,10 +62,14 @@
     setStatus("รูปพร้อมแล้ว กดวิเคราะห์จานนี้ได้เลย");
   }
 
-  document.querySelector("#choose-button").addEventListener("click", () => {
-    input.click();
-  });
+  input.addEventListener("click", () => { input.value = ""; });
   input.addEventListener("change", () => useFile(input.files?.[0]));
+  document.querySelector("#choose-button").addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      input.click();
+    }
+  });
 
   ["dragenter", "dragover"].forEach((eventName) => dropZone.addEventListener(eventName, (event) => {
     event.preventDefault();
@@ -463,11 +298,8 @@
 
   async function loadHistory() {
     const list = document.querySelector("#history-list");
-    if (!session) return;
-    const requestedUserId = activeUserId;
     try {
       const meals = await request("/api/meals");
-      if (!session || activeUserId !== requestedUserId) return;
       document.querySelector("#history-count").textContent = `${meals.length} มื้อ`;
       renderWeeklySummary(meals);
       if (!meals.length) {
@@ -490,7 +322,6 @@
         }
       }));
     } catch (error) {
-      if (!session || activeUserId !== requestedUserId) return;
       list.innerHTML = `<p class="history-empty">โหลดประวัติไม่ได้: ${escapeHtml(error.message)}</p>`;
     }
   }
@@ -552,7 +383,7 @@
     const proteinDays = days.filter((day) => day.proteinKnown > 0).length;
     const carbsDays = days.filter((day) => day.carbsKnown > 0).length;
     const fatDays = days.filter((day) => day.fatKnown > 0).length;
-    const proteinAverage = proteinDays ? formatNumber(proteinTotal / proteinDays, 1) : "—";
+    const proteinWeekTotal = proteinDays ? formatNumber(proteinTotal, 1) : "—";
     const calorieBars = days.map((day) => {
       const height = day.calories ? Math.max(4, day.calories / calorieScale * 100) : 0;
       return `<div class="weekly-day" title="${day.date.toLocaleDateString("th-TH")}: ${formatNumber(day.calories)} kcal จาก ${day.meals} มื้อ"><span class="weekly-day-value">${day.calories ? formatNumber(day.calories) : "—"}</span><div class="weekly-calorie-track"><i style="height:${height}%"></i></div><span class="weekly-day-label">${day.label}</span></div>`;
@@ -568,10 +399,10 @@
 
     summary.innerHTML = `
       <section class="weekly-card" aria-label="สรุปอาหารย้อนหลัง 7 วัน">
-        <div class="weekly-card-heading"><div><p class="eyebrow">YOUR LAST 7 DAYS</p><h3>ภาพรวม 7 วัน</h3></div><span>เฉลี่ยต่อวัน</span></div>
+        <div class="weekly-card-heading"><div><p class="eyebrow">YOUR LAST 7 DAYS</p><h3>ภาพรวม 7 วัน</h3></div><span>ยอดรวม 7 วัน</span></div>
         <div class="weekly-stats">
-          <div><span>พลังงาน</span><strong>${formatNumber(calorieTotal / 7)} <small>kcal</small></strong></div>
-          <div><span>โปรตีน*</span><strong>${proteinAverage} <small>g</small></strong></div>
+          <div><span>พลังงานรวม</span><strong>${formatNumber(calorieTotal)} <small>kcal</small></strong></div>
+          <div><span>โปรตีนรวม*</span><strong>${proteinWeekTotal} <small>g</small></strong></div>
           <div><span>บันทึกมื้อ</span><strong>${formatNumber(weekMeals)} <small>มื้อ</small></strong></div>
         </div>
         ${weekMeals ? `
@@ -581,6 +412,5 @@
       </section>`;
   }
 
-  restoreSession();
-  loadDemoUsers();
+  loadHistory();
 })();
