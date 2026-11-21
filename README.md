@@ -89,12 +89,12 @@ $env:DEMO_LOGIN_ENABLED = "true"
 จากโฟลเดอร์หลัก รันใน Terminal แรก:
 
 ```sh
-python -m uvicorn backend.app:app --reload --host 127.0.0.1 --port 8000
+python -m uvicorn ba<http://localhost:8000/health>ckend.app:app --reload --host 127.0.0.1 --port 8000
 ```
 
 เมื่อเห็นข้อความว่า Uvicorn กำลังรับคำขอ ให้เปิดใช้งาน backend ได้แล้ว:
 
-- ตรวจสถานะ: <http://localhost:8000/health>
+- ตรวจสถานะ: 
 - API documentation: <http://localhost:8000/docs>
 
 ฐานข้อมูล local ที่ `data/foodcal.db` และตาราง `users`, `foods`, `meals` จะถูกสร้างอัตโนมัติเมื่อ backend เริ่มทำงานครั้งแรก
