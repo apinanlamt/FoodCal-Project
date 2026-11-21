@@ -10,69 +10,116 @@ from PIL import Image
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-MODEL_PATH = Path(os.getenv("MODEL_PATH", str(PROJECT_ROOT / "backend" / "model" / "foodcal.pt")))
+MODEL_PATH = Path(
+    os.getenv("MODEL_PATH", str(PROJECT_ROOT / "backend" / "model" / "food101_effnetb0.onnx"))
+)
 CLASSES_PATH = Path(os.getenv("CLASSES_PATH", str(PROJECT_ROOT / "backend" / "model" / "classes.json")))
 MODEL_IMAGE_SIZE = int(os.getenv("MODEL_IMAGE_SIZE", "224"))
+MODEL_RESIZE_SIZE = int(os.getenv("MODEL_RESIZE_SIZE", "256"))
 MODEL_MEAN = np.asarray([0.485, 0.456, 0.406], dtype=np.float32)
 MODEL_STD = np.asarray([0.229, 0.224, 0.225], dtype=np.float32)
 
-_model = None
-_classes: list[str] | None = None
+MODEL_SPECS = {
+    "food101": {
+        "name": "Food-101",
+        "path": MODEL_PATH,
+        "classes_path": CLASSES_PATH,
+    },
+    "thfood50": {
+        "name": "THFOOD-50",
+        "path": Path(os.getenv("THFOOD50_MODEL_PATH", str(PROJECT_ROOT / "backend" / "model" / "thfood50_effnetb0.onnx"))),
+        "classes_path": Path(os.getenv("THFOOD50_CLASSES_PATH", str(PROJECT_ROOT / "backend" / "model" / "classes_thfood50.json"))),
+    },
+}
+_models: dict[str, tuple[object, list[str], str, str]] = {}
 _model_lock = Lock()
 
 
 class ModelNotReadyError(RuntimeError):
-    """The trained model or its class list is missing or invalid."""
+    """The ONNX model or its class list is missing or invalid."""
 
 
-def _load_model():
-    global _model, _classes
-    if _model is not None and _classes is not None:
-        return _model, _classes
+def _load_model(model_name: str = "food101"):
+    if model_name not in MODEL_SPECS:
+        raise ModelNotReadyError("เลือกรุ่นโมเดลไม่ถูกต้อง")
+    if model_name in _models:
+        return _models[model_name]
     with _model_lock:
-        if _model is not None and _classes is not None:
-            return _model, _classes
-        if not MODEL_PATH.is_file():
-            raise ModelNotReadyError(f"ไม่พบโมเดลที่ {MODEL_PATH}; วาง TorchScript model ชื่อ foodcal.pt ก่อนใช้งาน")
-        if not CLASSES_PATH.is_file():
-            raise ModelNotReadyError(f"ไม่พบไฟล์รายชื่อคลาสที่ {CLASSES_PATH}")
+        if model_name in _models:
+            return _models[model_name]
+        spec = MODEL_SPECS[model_name]
+        model_path = spec["path"]
+        classes_path = spec["classes_path"]
+        if not model_path.is_file():
+            raise ModelNotReadyError(f"ไม่พบโมเดล {spec['name']} ที่ {model_path}")
+        if not classes_path.is_file():
+            raise ModelNotReadyError(f"ไม่พบไฟล์รายชื่อคลาสของ {spec['name']} ที่ {classes_path}")
         try:
-            with CLASSES_PATH.open(encoding="utf-8") as class_file:
+            with classes_path.open(encoding="utf-8") as class_file:
                 classes = json.load(class_file)
             if not isinstance(classes, list) or not classes or not all(isinstance(item, str) for item in classes):
                 raise ValueError("classes.json ต้องเป็น JSON array ที่มีชื่อคลาสเป็นข้อความ")
-            import torch
 
-            model = torch.jit.load(str(MODEL_PATH), map_location="cpu")
-            model.eval()
+            import onnxruntime as ort
+
+            model = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+            inputs = model.get_inputs()
+            outputs = model.get_outputs()
+            if len(inputs) != 1 or len(outputs) != 1:
+                raise ValueError("โมเดลต้องมี input และ output อย่างละหนึ่งรายการ")
+            if len(inputs[0].shape) != 4 or inputs[0].shape[1:] != [3, MODEL_IMAGE_SIZE, MODEL_IMAGE_SIZE]:
+                raise ValueError(
+                    f"รูปแบบ input ของโมเดลไม่ตรงกับ [batch, 3, {MODEL_IMAGE_SIZE}, {MODEL_IMAGE_SIZE}]: "
+                    f"{inputs[0].shape}"
+                )
+            if len(outputs[0].shape) != 2 or outputs[0].shape[-1] not in (len(classes), "classes"):
+                raise ValueError(
+                    f"จำนวน output ของโมเดลไม่ตรงกับจำนวนคลาส ({len(classes)}): {outputs[0].shape}"
+                )
         except Exception as error:
-            raise ModelNotReadyError(f"โหลดโมเดลหรือ classes.json ไม่สำเร็จ: {error}") from error
-        _model = model
-        _classes = classes
-        return _model, _classes
+            raise ModelNotReadyError(f"โหลด ONNX model หรือ classes.json ไม่สำเร็จ: {error}") from error
+        _models[model_name] = (model, classes, inputs[0].name, outputs[0].name)
+        return _models[model_name]
 
 
-def predict_food(image: Image.Image) -> tuple[str, float]:
-    model, classes = _load_model()
-    import torch
+def model_info(model_name: str) -> dict[str, object]:
+    model, classes, _, _ = _load_model(model_name)
+    return {"model_name": MODEL_SPECS[model_name]["name"], "class_count": len(classes)}
 
-    resized = image.convert("RGB").resize((MODEL_IMAGE_SIZE, MODEL_IMAGE_SIZE), Image.Resampling.BILINEAR)
-    pixels = np.asarray(resized, dtype=np.float32) / 255.0
+
+def model_availability() -> dict[str, bool]:
+    return {name: spec["path"].is_file() and spec["classes_path"].is_file() for name, spec in MODEL_SPECS.items()}
+
+
+def predict_food(image: Image.Image, model_name: str = "food101") -> tuple[str, float, list[tuple[str, float]]]:
+    model, classes, input_name, output_name = _load_model(model_name)
+    image = image.convert("RGB")
+    width, height = image.size
+    if width <= height:
+        resize_width = MODEL_RESIZE_SIZE
+        resize_height = int(MODEL_RESIZE_SIZE * height / width)
+    else:
+        resize_height = MODEL_RESIZE_SIZE
+        resize_width = int(MODEL_RESIZE_SIZE * width / height)
+    resized = image.resize((resize_width, resize_height), Image.Resampling.BILINEAR)
+    left = int(round((resize_width - MODEL_IMAGE_SIZE) / 2.0))
+    top = int(round((resize_height - MODEL_IMAGE_SIZE) / 2.0))
+    cropped = resized.crop((left, top, left + MODEL_IMAGE_SIZE, top + MODEL_IMAGE_SIZE))
+    pixels = np.asarray(cropped, dtype=np.float32) / 255.0
     normalized = (pixels - MODEL_MEAN) / MODEL_STD
-    tensor = torch.from_numpy(normalized.transpose(2, 0, 1).copy()).unsqueeze(0)
+    tensor = np.ascontiguousarray(normalized.transpose(2, 0, 1)[None, ...], dtype=np.float32)
     try:
-        with torch.inference_mode():
-            output = model(tensor)
-        if isinstance(output, dict):
-            output = next(iter(output.values()))
-        elif isinstance(output, (tuple, list)):
-            output = output[0]
-        if not isinstance(output, torch.Tensor) or output.ndim != 2 or output.shape[0] != 1:
-            raise ValueError("โมเดลต้องคืน logits ในรูป tensor ขนาด [1, จำนวนคลาส]")
+        output = model.run([output_name], {input_name: tensor})[0]
+        if not isinstance(output, np.ndarray) or output.ndim != 2 or output.shape[0] != 1:
+            raise ValueError("โมเดลต้องคืน logits ขนาด [1, จำนวนคลาส]")
         if output.shape[1] != len(classes):
             raise ValueError(f"จำนวน output ({output.shape[1]}) ไม่ตรงกับจำนวนคลาส ({len(classes)})")
-        probabilities = torch.softmax(output[0], dim=0)
-        index = int(torch.argmax(probabilities).item())
-        return classes[index], float(probabilities[index].item())
+        logits = output[0].astype(np.float64)
+        probabilities = np.exp(logits - np.max(logits))
+        probabilities /= probabilities.sum()
+        top_indices = np.argsort(probabilities)[-3:][::-1]
+        top_predictions = [(classes[int(index)], float(probabilities[index])) for index in top_indices]
+        label, score = top_predictions[0]
+        return label, score, top_predictions
     except Exception as error:
-        raise ModelNotReadyError(f"ประมวลผลรูปด้วยโมเดลไม่สำเร็จ: {error}") from error
+        raise ModelNotReadyError(f"ประมวลผลรูปด้วย ONNX model ไม่สำเร็จ: {error}") from error

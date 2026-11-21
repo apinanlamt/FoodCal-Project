@@ -1,12 +1,3 @@
----
-title: FoodCal API
-emoji: 🍽️
-colorFrom: green
-colorTo: yellow
-sdk: docker
-app_port: 7860
----
-
 # FoodCal
 
 เว็บสำหรับอัปโหลด/ถ่ายภาพอาหาร ใช้โมเดลที่ train แล้วจำแนกอาหาร แสดงแคลอรีและสารอาหารโดยประมาณ และบันทึกประวัติแยกตามบัญชีผู้ใช้
@@ -19,17 +10,14 @@ app_port: 7860
 - [วิธีใช้งานเว็บไซต์](#วิธีใช้งานเว็บไซต์)
 - [ใส่โมเดลที่ train แล้ว](#ใส่โมเดลที่-train-แล้ว)
 - [แก้ปัญหาเบื้องต้น](#แก้ปัญหาเบื้องต้น)
-- [Deploy](#deploy)
 
 ## โครงสร้างโปรเจกต์
 
 - `frontend/` — หน้าเว็บ HTML, CSS, JavaScript
 - `backend/` — FastAPI, ระบบ login/JWT, ฐานข้อมูล และ model inference
-- `backend/model/` — ที่วางโมเดล `foodcal.pt` และรายชื่อคลาส `classes.json`
+- `backend/model/` — ONNX models สำหรับ Food-101 และ THFOOD-50 พร้อมรายชื่อคลาสและข้อมูลโภชนาการ
 - `database/` — ข้อมูลโภชนาการเริ่มต้น
 - `data/foodcal.db` — SQLite ที่สร้างอัตโนมัติเมื่อรัน backend ในเครื่อง; มีบัญชีผู้ใช้และประวัติมื้อ จึงไม่ควร commit/share ไฟล์นี้
-- `deploy/DEPLOY.md` — คู่มือ deploy Vercel + Hugging Face Spaces + Neon
-- `Dockerfile` — ใช้สำหรับ deploy backend บน Hugging Face Spaces เท่านั้น
 
 ## สิ่งที่ต้องติดตั้ง
 
@@ -38,8 +26,7 @@ app_port: 7860
 1. **Python 3.11 หรือ 3.12** — ใช้รัน backend และ frontend แบบ static
 2. **Git** — ใช้ clone repository (ถ้ามีโฟลเดอร์โปรเจกต์อยู่แล้วไม่ต้องติดตั้งเพิ่ม)
 3. **ไม่ต้องติดตั้ง Node.js, npm หรือ Docker** เพื่อรันเว็บในเครื่อง
-4. **PyTorch** — ใช้ทำนายภาพ ต้องติดตั้งแยกตาม OS ตามขั้นตอนด้านล่าง
-5. **โมเดล FoodCal จริง** — ยังไม่จำเป็นสำหรับเปิดเว็บ/login แต่ต้องมีจึงจะวิเคราะห์ภาพได้
+4. **โมเดล FoodCal** — ONNX Runtime ติดตั้งจาก `backend/requirements.txt`; ต้องมีไฟล์ ONNX และรายชื่อคลาสของโมเดลที่ต้องการใช้ โดย Food-101 มี sidecar เพิ่มอีกหนึ่งไฟล์
 
 ## ติดตั้งและรันในเครื่อง
 
@@ -73,12 +60,7 @@ python -m pip install --upgrade pip
 python -m pip install -r backend/requirements.txt
 ```
 
-ติดตั้ง PyTorch เพิ่ม:
-
-- **macOS หรือ Windows:** `python -m pip install torch`
-- **Linux ที่ใช้ CPU:** `python -m pip install torch --index-url https://download.pytorch.org/whl/cpu`
-
-> ใน Docker image สำหรับ Hugging Face จะติดตั้ง CPU-only PyTorch ให้อัตโนมัติ ส่วนขั้นตอนด้านบนเป็นการติดตั้งสำหรับรันในเครื่อง
+ONNX Runtime จะติดตั้งพร้อม dependencies จาก `backend/requirements.txt` ทั้ง local และ Docker
 
 ### 3. ตั้งค่าบัญชีทดลองสำหรับ local
 
@@ -153,36 +135,29 @@ python -m http.server 8080 --directory frontend --bind 127.0.0.1
    | `demo2@foodcal.test` | `FoodCalDemo2!` |
    | `demo3@foodcal.test` | `FoodCalDemo3!` |
 
-3. เมื่อ login แล้ว เลือก **เลือกรูปภาพ** หรือ **ถ่ายรูป**; บนมือถือปุ่มถ่ายรูปจะเปิดกล้อง
-4. ระบุปริมาณโดยประมาณเป็นกรัม แล้วกด **วิเคราะห์จานนี้**
+3. เมื่อ login แล้ว เลือกชุดโมเดลให้ตรงกับอาหารในภาพ: **Food-101** สำหรับ 101 คลาสสากล หรือ **THFOOD-50** สำหรับ 50 คลาสอาหารไทย
+4. เลือก **เลือกรูปภาพ** หรือ **ถ่ายรูป**; บนมือถือปุ่มถ่ายรูปจะเปิดกล้อง ระบุปริมาณโดยประมาณเป็นกรัม แล้วกด **วิเคราะห์จานนี้**
 5. ดูชื่ออาหาร ความมั่นใจ แคลอรีและสารอาหารโดยประมาณ
 6. กด **บันทึกมื้อนี้** เพื่อเก็บประวัติของบัญชีนั้น
 7. บัญชีเดโมทั้งสามมีประวัติแยกกัน; admin สร้างบัญชี user เพิ่มได้จากฟอร์ม **สร้างบัญชีผู้ใช้**
 
 ข้อมูลบัญชีและมื้อ local เก็บใน `data/foodcal.db`; รหัสผ่านเก็บเป็น Argon2 hash ไม่ใช่ plain text. บัญชีทดลองเป็นข้อมูลสาธิต อย่าใช้รหัสผ่านเดียวกันกับบัญชีส่วนตัวหรือใช้บน production
 
-## ใส่โมเดลที่ train แล้ว
+## โมเดลจำแนกภาพ
 
-วางไฟล์ไว้ดังนี้:
+เว็บให้เลือกใช้โมเดล Food-101 (101 คลาส) หรือ THFOOD-50 (50 คลาส) ก่อนวิเคราะห์. Food-101 ใช้ `food101_effnetb0.onnx`, `food101_effnetb0.onnx.data` และ `classes.json`; THFOOD-50 ใช้ `thfood50_effnetb0.onnx` และ `classes_thfood50.json` โดยไฟล์ ONNX ของ THFOOD-50 ที่ส่งออกมามีน้ำหนักอยู่ในไฟล์เดียว. รายชื่อคลาสต้องเรียงตรงกับ output ของโมเดล. ทั้งสองโมเดลใช้ preprocessing แบบ resize ด้านสั้นเป็น 256, center crop 224 และ ImageNet normalization. โมเดลจำแนกชื่ออาหารจากภาพ ไม่ได้คำนวณน้ำหนักจริงหรือสารอาหารจากภาพ
 
-- `backend/model/foodcal.pt` — TorchScript model ที่โหลดด้วย `torch.jit.load()` ได้
-- `backend/model/classes.json` — JSON array ของชื่อคลาส เรียงตามลำดับ output ของโมเดล
+คะแนน softmax ของ Food-101 และ THFOOD-50 มาจากคนละโมเดล จึงไม่ควรนำมาเทียบกันโดยตรง. ข้อมูลโภชนาการในเว็บมีแหล่ง USDA สำหรับคลาส Food-101; ฝั่ง THFOOD-50 จะแสดงโภชนาการเฉพาะคลาสที่มีรายการจับคู่ในฐานข้อมูลเท่านั้น (ปัจจุบันมี Pad Thai) และจะไม่เดาค่าให้คลาสอื่น
 
-ตรวจให้ preprocessing ใน `backend/inference.py` (ขนาดภาพ, resize, normalization) ตรงกับขั้นตอน train และชื่อคลาสตรงกับ `food_key` ใน `database/foods_seed.json`. หลังวางโมเดล ให้ restart backend. ไฟล์ `classes.json` ที่แนบใน repo เป็นเพียงตัวอย่าง และไม่มี trained weights.
-
-หากไม่มีไฟล์โมเดล เว็บและ login ยังเปิดได้ แต่ `/api/predict` จะตอบว่า model ยังไม่พร้อม; จะไม่มีผลทำนายปลอม. ระบบจำแนกชื่ออาหารจากภาพแล้วคูณข้อมูลโภชนาการตามน้ำหนักที่ผู้ใช้กรอก ไม่ได้คำนวณน้ำหนักจริงจากภาพ
+`backend/model/usda_fndds_mappings.json` เก็บ snapshot จาก USDA FoodData Central FNDDS 2021–2023 และ SR Legacy ที่จับคู่กับคลาสโมเดล พร้อม FDC ID และชื่อรายการต้นทาง. เว็บใช้ข้อมูลจากไฟล์นี้โดยตรง ไม่เรียก API ของ USDA ทุกครั้งที่ทำนาย และไม่ต้องใช้ API key. ปัจจุบันมี 43 คลาสที่จับคู่ตรง, 45 คลาสใช้รายการใกล้เคียง, และ 13 คลาสยังใช้ค่าแคลอรี่ชั่วคราวจาก `calories.json` โดยไม่มีสารอาหารหลักหรือแหล่ง USDA. ระบบแสดงสถานะและลิงก์รายการ USDA ต้นทางสำหรับค่าที่จับคู่แล้ว; ค่าใกล้เคียงและค่าชั่วคราวไม่ควรอธิบายว่าเป็นโภชนาการสูตรตรงของอาหารในภาพ. อ้างอิง: U.S. Department of Agriculture, Agricultural Research Service, FoodData Central, FNDDS 2021–2023 และ SR Legacy, https://fdc.nal.usda.gov/.
 
 ## แก้ปัญหาเบื้องต้น
 
 - **หน้าเว็บไม่ขึ้น / connection refused ที่ 8080:** ตรวจว่า Terminal frontend ยังรันอยู่. ถ้าหยุดด้วย `Ctrl+C` ให้รันคำสั่ง `python3 -m http.server 8080 --directory frontend --bind 127.0.0.1` ใหม่
 - **เว็บขึ้นแต่ login/API ไม่ได้:** ตรวจว่า backend Terminal ยังรันและเปิด <http://localhost:8000/health> ได้
 - **`Address already in use`:** มีโปรแกรมใช้งาน port `8080` หรือ `8000`; หยุด process เดิมก่อน หรือแก้ port แล้วปรับ `frontend/config.js` ให้ API URL ตรงกัน
-- **`ModuleNotFoundError`:** ตรวจว่า `.venv` active แล้วติดตั้ง `python -m pip install -r backend/requirements.txt`; ถ้าข้อความพูดถึง `torch` ให้ติดตั้ง PyTorch ตาม OS ด้านบน
+- **`ModuleNotFoundError`:** ตรวจว่า `.venv` active แล้วติดตั้ง `python -m pip install -r backend/requirements.txt`
 - **login ไม่สำเร็จหลังเริ่ม backend:** ตรวจว่า Terminal backend ตั้ง `DEMO_LOGIN_ENABLED=true` และเริ่ม backend ใหม่หลังตั้ง environment variables
-- **วิเคราะห์แล้วแจ้งไม่มี model:** วาง TorchScript ไฟล์ชื่อ `foodcal.pt` ใน `backend/model/` และ restart API
+- **วิเคราะห์แล้วแจ้งไม่มี model:** ตรวจว่า ONNX และ class list ของโมเดลที่เลือกอยู่ใน `backend/model/` แล้ว restart API; sidecar `.onnx.data` จำเป็นเฉพาะ Food-101
 - **แคลอรี/สารอาหารไม่พบ:** ตรวจว่าคลาสที่โมเดลทำนายมีรายการตรงกันใน `database/foods_seed.json`; ค่า seed เป็นข้อมูลตัวอย่าง ควรตรวจสอบก่อนใช้จริง
-- **Browser แจ้ง CORS:** ใช้ local frontend ที่ `http://localhost:8080` กับ backend ที่ `http://localhost:8000`; ใน production ต้องตั้ง `CORS_ORIGINS` ให้ตรงกับ domain ของเว็บ
-
-## Deploy
-
-Vercel ใช้เสิร์ฟ frontend เท่านั้น; FastAPI/PyTorch อยู่บน Hugging Face Spaces และ production database ใช้ Neon Postgres เพื่อให้ข้อมูลบัญชี/ประวัติไม่หายเมื่อ container restart. ขั้นตอนทั้งหมดและ environment variables อยู่ใน [deploy/DEPLOY.md](deploy/DEPLOY.md). อย่าเปิด `DEMO_LOGIN_ENABLED` ใน public backend.
+- **Browser แจ้ง CORS:** ใช้ local frontend ที่ `http://localhost:8080` กับ backend ที่ `http://localhost:8000`

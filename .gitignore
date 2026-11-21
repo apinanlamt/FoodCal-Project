@@ -7,3 +7,5 @@ data/*.db-wal
 *.db-wal
 __pycache__/
 .venv/
+**/.venv*/
+.DS_Store

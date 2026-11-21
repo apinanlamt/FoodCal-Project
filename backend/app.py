@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 from contextlib import asynccontextmanager
@@ -10,7 +11,7 @@ from uuid import uuid4
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -18,13 +19,15 @@ from sqlalchemy.orm import Session
 from backend.auth import create_access_token, decode_access_token, hash_password, verify_password
 from backend.database import Food, Meal, User, get_session, initialize_database
 from backend.demo_accounts import DEMO_USERS, demo_login_enabled
-from backend.inference import ModelNotReadyError, predict_food
+from backend.inference import ModelNotReadyError, model_availability, model_info, predict_food
 
 
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_IMAGE_PIXELS = 20_000_000
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+with (PROJECT_ROOT / "backend" / "model" / "usda_fndds_mappings.json").open(encoding="utf-8") as nutrition_file:
+    NUTRITION_REFERENCE = json.load(nutrition_file)
 
 
 @asynccontextmanager
@@ -160,13 +163,31 @@ def create_user(
     return _user_response(user)
 
 
-def _nutrition(food: Food, servings_g: float) -> dict[str, float]:
+def _nutrition(food: Food, servings_g: float) -> dict[str, float | None]:
     multiplier = servings_g / 100
     return {
         "calories_kcal": round(food.calories_kcal * multiplier, 1),
-        "protein_g": round(food.protein_g * multiplier, 1),
-        "carbs_g": round(food.carbs_g * multiplier, 1),
-        "fat_g": round(food.fat_g * multiplier, 1),
+        "protein_g": round(food.protein_g * multiplier, 1) if food.protein_g is not None else None,
+        "carbs_g": round(food.carbs_g * multiplier, 1) if food.carbs_g is not None else None,
+        "fat_g": round(food.fat_g * multiplier, 1) if food.fat_g is not None else None,
+    }
+
+
+def _nutrition_source(food_key: str) -> dict[str, object]:
+    if food_key == "PadThai":
+        food_key = "pad_thai"
+    item = NUTRITION_REFERENCE.get(food_key, {})
+    return {
+        "source": item.get("source", "Unverified estimate"),
+        "fdc_id": item.get("fdc_id"),
+        "fdc_description": item.get("fdc_description"),
+        "source_item": item.get("source_item"),
+        "data_type": item.get("data_type"),
+        "release_date": item.get("release_date"),
+        "reference_serving": item.get("serving"),
+        "reference_serving_g": item.get("serving_g"),
+        "match_quality": item.get("match_quality", "unverified"),
+        "verified": bool(item.get("verified", False)),
     }
 
 
@@ -182,12 +203,26 @@ def _food_for_label(db: Session, label: str) -> Food | None:
     return None
 
 
+def _nutrition_lookup_label(model_name: str, label: str) -> str:
+    # Only map a Thai class when the existing nutrition database has a matching
+    # sourced entry. Other Thai predictions remain classification-only.
+    if model_name == "thfood50" and label == "PadThai":
+        return "pad_thai"
+    return label
+
+
+def _display_label(label: str) -> str:
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", label.replace("_", " "))
+    return spaced.strip().title()
+
+
 @app.get("/health")
 def health() -> dict[str, object]:
-    model_path = Path(os.getenv("MODEL_PATH", str(PROJECT_ROOT / "backend" / "model" / "foodcal.pt")))
+    models = model_availability()
     return {
         "status": "ok",
-        "model_available": model_path.is_file(),
+        "model_available": models["food101"],
+        "models": models,
         "database": "configured",
     }
 
@@ -210,6 +245,7 @@ def list_foods(
 def predict(
     file: Annotated[UploadFile, File(description="Food image (JPEG, PNG or WebP)")],
     servings_g: Annotated[float, Form(gt=0, le=2000)] = 250,
+    model_name: Annotated[str, Form()] = "food101",
     db: Session = Depends(get_session),
     _: User = Depends(get_current_user),
 ) -> dict[str, object]:
@@ -226,24 +262,38 @@ def predict(
         with Image.open(BytesIO(raw_image)) as source:
             if source.width * source.height > MAX_IMAGE_PIXELS:
                 raise HTTPException(status_code=413, detail="ความละเอียดรูปภาพสูงเกินไป")
-            image = source.convert("RGB")
+            image = ImageOps.exif_transpose(source).convert("RGB")
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
         raise HTTPException(status_code=400, detail="ไม่สามารถอ่านไฟล์รูปภาพนี้ได้") from None
 
     try:
-        label, confidence = predict_food(image)
+        info = model_info(model_name)
+        label, confidence, top_predictions = predict_food(image, model_name)
     except ModelNotReadyError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
 
-    food = _food_for_label(db, label)
+    nutrition_label = _nutrition_lookup_label(model_name, label)
+    food = _food_for_label(db, nutrition_label)
     nutrition = _nutrition(food, servings_g) if food else None
+    ranked_predictions = []
+    for candidate_label, score in top_predictions:
+        candidate_food = _food_for_label(db, _nutrition_lookup_label(model_name, candidate_label))
+        ranked_predictions.append({
+            "label": candidate_label,
+            "food_name": candidate_food.name if candidate_food else _display_label(candidate_label),
+            "score": round(score, 5),
+        })
     return {
+        "model": model_name,
+        **info,
         "predicted_label": label,
         "food_id": food.id if food else None,
-        "food_name": food.name if food else label.replace("_", " ").title(),
+        "food_name": food.name if food else _display_label(label),
         "confidence": round(confidence, 5),
+        "top_predictions": ranked_predictions,
         "servings_g": round(servings_g, 1),
         "nutrition": nutrition,
+        "nutrition_source": _nutrition_source(nutrition_label),
     }
 
 
@@ -283,6 +333,7 @@ def _meal_response(meal: Meal) -> dict[str, object]:
         "protein_g": meal.protein_g,
         "carbs_g": meal.carbs_g,
         "fat_g": meal.fat_g,
+        "nutrition_source": _nutrition_source(meal.predicted_label),
         "created_at": meal.created_at.isoformat() if meal.created_at else None,
     }
 

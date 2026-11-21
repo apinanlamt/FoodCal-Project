@@ -1,0 +1,821 @@
+{
+  "_meta": {
+    "note": "kcal are rough estimates for a typical serving, NOT verified. Check each against USDA FoodData Central (or the Thai source) before citing; then set verified=true and fill source/source_item.",
+    "fields": [
+      "serving",
+      "serving_g",
+      "kcal",
+      "verified",
+      "source",
+      "source_item"
+    ]
+  },
+  "apple_pie": {
+    "serving": "1 slice",
+    "serving_g": 125,
+    "kcal": 300,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "baby_back_ribs": {
+    "serving": "1 serving (ribs)",
+    "serving_g": 250,
+    "kcal": 650,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "baklava": {
+    "serving": "1 piece",
+    "serving_g": 60,
+    "kcal": 290,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "beef_carpaccio": {
+    "serving": "1 plate",
+    "serving_g": 100,
+    "kcal": 180,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "beef_tartare": {
+    "serving": "1 plate",
+    "serving_g": 120,
+    "kcal": 250,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "beet_salad": {
+    "serving": "1 bowl",
+    "serving_g": 200,
+    "kcal": 160,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "beignets": {
+    "serving": "3 pieces",
+    "serving_g": 100,
+    "kcal": 350,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "bibimbap": {
+    "serving": "1 bowl",
+    "serving_g": 500,
+    "kcal": 560,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "bread_pudding": {
+    "serving": "1 serving",
+    "serving_g": 170,
+    "kcal": 400,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "breakfast_burrito": {
+    "serving": "1 burrito",
+    "serving_g": 200,
+    "kcal": 450,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "bruschetta": {
+    "serving": "2 pieces",
+    "serving_g": 100,
+    "kcal": 180,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "caesar_salad": {
+    "serving": "1 plate",
+    "serving_g": 250,
+    "kcal": 330,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "cannoli": {
+    "serving": "1 piece",
+    "serving_g": 90,
+    "kcal": 340,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "caprese_salad": {
+    "serving": "1 plate",
+    "serving_g": 200,
+    "kcal": 300,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "carrot_cake": {
+    "serving": "1 slice",
+    "serving_g": 120,
+    "kcal": 450,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "ceviche": {
+    "serving": "1 serving",
+    "serving_g": 200,
+    "kcal": 180,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "cheesecake": {
+    "serving": "1 slice",
+    "serving_g": 125,
+    "kcal": 400,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "cheese_plate": {
+    "serving": "1 plate",
+    "serving_g": 100,
+    "kcal": 400,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "chicken_curry": {
+    "serving": "1 bowl",
+    "serving_g": 300,
+    "kcal": 380,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "chicken_quesadilla": {
+    "serving": "1 piece",
+    "serving_g": 200,
+    "kcal": 530,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "chicken_wings": {
+    "serving": "6 pieces",
+    "serving_g": 200,
+    "kcal": 580,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "chocolate_cake": {
+    "serving": "1 slice",
+    "serving_g": 110,
+    "kcal": 400,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "chocolate_mousse": {
+    "serving": "1 cup",
+    "serving_g": 120,
+    "kcal": 300,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "churros": {
+    "serving": "3 pieces",
+    "serving_g": 90,
+    "kcal": 350,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "clam_chowder": {
+    "serving": "1 bowl",
+    "serving_g": 250,
+    "kcal": 250,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "club_sandwich": {
+    "serving": "1 sandwich",
+    "serving_g": 250,
+    "kcal": 590,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "crab_cakes": {
+    "serving": "2 cakes",
+    "serving_g": 160,
+    "kcal": 330,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "creme_brulee": {
+    "serving": "1 ramekin",
+    "serving_g": 150,
+    "kcal": 340,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "croque_madame": {
+    "serving": "1 sandwich",
+    "serving_g": 250,
+    "kcal": 600,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "cup_cakes": {
+    "serving": "1 cupcake",
+    "serving_g": 80,
+    "kcal": 300,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "deviled_eggs": {
+    "serving": "4 halves",
+    "serving_g": 100,
+    "kcal": 200,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "donuts": {
+    "serving": "1 donut",
+    "serving_g": 70,
+    "kcal": 290,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "dumplings": {
+    "serving": "6 pieces",
+    "serving_g": 180,
+    "kcal": 300,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "edamame": {
+    "serving": "1 cup",
+    "serving_g": 150,
+    "kcal": 190,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "eggs_benedict": {
+    "serving": "1 serving",
+    "serving_g": 230,
+    "kcal": 480,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "escargots": {
+    "serving": "6 pieces",
+    "serving_g": 100,
+    "kcal": 300,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "falafel": {
+    "serving": "4 pieces",
+    "serving_g": 100,
+    "kcal": 330,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "filet_mignon": {
+    "serving": "1 steak",
+    "serving_g": 200,
+    "kcal": 440,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "fish_and_chips": {
+    "serving": "1 plate",
+    "serving_g": 400,
+    "kcal": 850,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "foie_gras": {
+    "serving": "1 serving",
+    "serving_g": 60,
+    "kcal": 260,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "french_fries": {
+    "serving": "1 medium portion",
+    "serving_g": 117,
+    "kcal": 365,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "french_onion_soup": {
+    "serving": "1 bowl",
+    "serving_g": 300,
+    "kcal": 370,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "french_toast": {
+    "serving": "2 slices",
+    "serving_g": 130,
+    "kcal": 300,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "fried_calamari": {
+    "serving": "1 plate",
+    "serving_g": 150,
+    "kcal": 360,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "fried_rice": {
+    "serving": "1 plate",
+    "serving_g": 300,
+    "kcal": 450,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "frozen_yogurt": {
+    "serving": "1 cup",
+    "serving_g": 140,
+    "kcal": 220,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "garlic_bread": {
+    "serving": "2 slices",
+    "serving_g": 60,
+    "kcal": 200,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "gnocchi": {
+    "serving": "1 plate",
+    "serving_g": 250,
+    "kcal": 380,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "greek_salad": {
+    "serving": "1 bowl",
+    "serving_g": 250,
+    "kcal": 280,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "grilled_cheese_sandwich": {
+    "serving": "1 sandwich",
+    "serving_g": 130,
+    "kcal": 400,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "grilled_salmon": {
+    "serving": "1 fillet",
+    "serving_g": 170,
+    "kcal": 350,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "guacamole": {
+    "serving": "1/2 cup",
+    "serving_g": 120,
+    "kcal": 200,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "gyoza": {
+    "serving": "6 pieces",
+    "serving_g": 150,
+    "kcal": 290,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "hamburger": {
+    "serving": "1 burger",
+    "serving_g": 200,
+    "kcal": 540,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "hot_and_sour_soup": {
+    "serving": "1 bowl",
+    "serving_g": 250,
+    "kcal": 120,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "hot_dog": {
+    "serving": "1 hot dog with bun",
+    "serving_g": 150,
+    "kcal": 320,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "huevos_rancheros": {
+    "serving": "1 plate",
+    "serving_g": 300,
+    "kcal": 480,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "hummus": {
+    "serving": "1/2 cup",
+    "serving_g": 120,
+    "kcal": 200,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "ice_cream": {
+    "serving": "1 cup",
+    "serving_g": 130,
+    "kcal": 270,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "lasagna": {
+    "serving": "1 piece",
+    "serving_g": 300,
+    "kcal": 500,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "lobster_bisque": {
+    "serving": "1 bowl",
+    "serving_g": 250,
+    "kcal": 300,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "lobster_roll_sandwich": {
+    "serving": "1 roll",
+    "serving_g": 200,
+    "kcal": 450,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "macaroni_and_cheese": {
+    "serving": "1 cup",
+    "serving_g": 200,
+    "kcal": 400,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "macarons": {
+    "serving": "2 pieces",
+    "serving_g": 40,
+    "kcal": 160,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "miso_soup": {
+    "serving": "1 bowl",
+    "serving_g": 240,
+    "kcal": 60,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "mussels": {
+    "serving": "1 serving",
+    "serving_g": 250,
+    "kcal": 220,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "nachos": {
+    "serving": "1 plate",
+    "serving_g": 200,
+    "kcal": 600,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "omelette": {
+    "serving": "3-egg omelette",
+    "serving_g": 180,
+    "kcal": 350,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "onion_rings": {
+    "serving": "1 serving",
+    "serving_g": 120,
+    "kcal": 400,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "oysters": {
+    "serving": "6 pieces",
+    "serving_g": 110,
+    "kcal": 100,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "pad_thai": {
+    "serving": "1 plate",
+    "serving_g": 300,
+    "kcal": 600,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "paella": {
+    "serving": "1 plate",
+    "serving_g": 350,
+    "kcal": 550,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "pancakes": {
+    "serving": "3 pancakes",
+    "serving_g": 200,
+    "kcal": 450,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "panna_cotta": {
+    "serving": "1 serving",
+    "serving_g": 150,
+    "kcal": 300,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "peking_duck": {
+    "serving": "1 serving",
+    "serving_g": 150,
+    "kcal": 450,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "pho": {
+    "serving": "1 bowl",
+    "serving_g": 600,
+    "kcal": 450,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "pizza": {
+    "serving": "1 slice",
+    "serving_g": 110,
+    "kcal": 285,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "pork_chop": {
+    "serving": "1 chop",
+    "serving_g": 200,
+    "kcal": 380,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "poutine": {
+    "serving": "1 serving",
+    "serving_g": 300,
+    "kcal": 740,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "prime_rib": {
+    "serving": "1 serving",
+    "serving_g": 250,
+    "kcal": 700,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "pulled_pork_sandwich": {
+    "serving": "1 sandwich",
+    "serving_g": 250,
+    "kcal": 520,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "ramen": {
+    "serving": "1 bowl",
+    "serving_g": 500,
+    "kcal": 550,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "ravioli": {
+    "serving": "1 plate",
+    "serving_g": 250,
+    "kcal": 400,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "red_velvet_cake": {
+    "serving": "1 slice",
+    "serving_g": 120,
+    "kcal": 420,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "risotto": {
+    "serving": "1 plate",
+    "serving_g": 250,
+    "kcal": 420,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "samosa": {
+    "serving": "2 pieces",
+    "serving_g": 100,
+    "kcal": 300,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "sashimi": {
+    "serving": "8 pieces",
+    "serving_g": 120,
+    "kcal": 180,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "scallops": {
+    "serving": "4 pieces",
+    "serving_g": 120,
+    "kcal": 160,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "seaweed_salad": {
+    "serving": "1 small portion",
+    "serving_g": 100,
+    "kcal": 70,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "shrimp_and_grits": {
+    "serving": "1 bowl",
+    "serving_g": 300,
+    "kcal": 500,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "spaghetti_bolognese": {
+    "serving": "1 plate",
+    "serving_g": 350,
+    "kcal": 600,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "spaghetti_carbonara": {
+    "serving": "1 plate",
+    "serving_g": 300,
+    "kcal": 700,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "spring_rolls": {
+    "serving": "2 pieces (fried)",
+    "serving_g": 120,
+    "kcal": 280,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "steak": {
+    "serving": "1 steak",
+    "serving_g": 200,
+    "kcal": 500,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "strawberry_shortcake": {
+    "serving": "1 slice",
+    "serving_g": 150,
+    "kcal": 350,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "sushi": {
+    "serving": "6 pieces",
+    "serving_g": 180,
+    "kcal": 300,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "tacos": {
+    "serving": "2 tacos",
+    "serving_g": 200,
+    "kcal": 400,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "takoyaki": {
+    "serving": "6 pieces",
+    "serving_g": 150,
+    "kcal": 300,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "tiramisu": {
+    "serving": "1 slice",
+    "serving_g": 120,
+    "kcal": 400,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "tuna_tartare": {
+    "serving": "1 serving",
+    "serving_g": 120,
+    "kcal": 180,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  },
+  "waffles": {
+    "serving": "1 waffle",
+    "serving_g": 75,
+    "kcal": 220,
+    "verified": false,
+    "source": null,
+    "source_item": null
+  }
+}

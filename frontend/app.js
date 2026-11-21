@@ -12,6 +12,12 @@
   const createUserForm = document.querySelector("#create-user-form");
   const demoLoginPanel = document.querySelector("#demo-login-panel");
   const demoLoginList = document.querySelector("#demo-login-list");
+  const cameraButton = document.querySelector("#camera-button");
+  const cameraPanel = document.querySelector("#camera-panel");
+  const cameraVideo = document.querySelector("#camera-video");
+  const cameraDevice = document.querySelector("#camera-device");
+  const classifierSelect = document.querySelector("#classifier-select");
+  let cameraStream = null;
   let selectedFile = null;
   let currentResult = null;
   let previewUrl = null;
@@ -195,8 +201,8 @@
 
   function useFile(file) {
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setStatus("กรุณาเลือกไฟล์รูปภาพ", "error");
+    if (!new Set(["image/jpeg", "image/png", "image/webp"]).has(file.type)) {
+      setStatus("รองรับเฉพาะ JPG, PNG และ WEBP หากเป็น HEIC ให้บันทึกเป็น JPG ก่อน", "error");
       return;
     }
     if (file.size > 8 * 1024 * 1024) {
@@ -223,10 +229,88 @@
     input.removeAttribute("capture");
     input.click();
   });
-  document.querySelector("#camera-button").addEventListener("click", () => {
-    input.setAttribute("capture", "environment");
-    input.click();
+  function stopCamera() {
+    cameraStream?.getTracks().forEach((track) => track.stop());
+    cameraStream = null;
+    cameraVideo.srcObject = null;
+    cameraPanel.hidden = true;
+    cameraButton.disabled = false;
+  }
+
+  async function refreshCameraDevices(selectedDeviceId = "") {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cameras = devices.filter((device) => device.kind === "videoinput");
+    cameraDevice.replaceChildren();
+    cameras.forEach((device, index) => {
+      const option = document.createElement("option");
+      option.value = device.deviceId;
+      option.textContent = device.label || `กล้อง ${index + 1}`;
+      cameraDevice.append(option);
+    });
+    if (selectedDeviceId && cameras.some((device) => device.deviceId === selectedDeviceId)) {
+      cameraDevice.value = selectedDeviceId;
+    }
+    cameraDevice.disabled = cameras.length < 2;
+  }
+
+  async function startCamera(deviceId = "") {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setStatus("เบราว์เซอร์นี้เปิดกล้องไม่ได้ กรุณาใช้ Chrome หรือ Safari เวอร์ชันปัจจุบัน", "error");
+      return;
+    }
+    cameraButton.disabled = true;
+    setStatus("กำลังเชื่อมต่อกล้อง…");
+    try {
+      cameraStream?.getTracks().forEach((track) => track.stop());
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: "environment" } },
+      });
+      cameraVideo.srcObject = cameraStream;
+      cameraPanel.hidden = false;
+      await cameraVideo.play();
+      await refreshCameraDevices(cameraStream.getVideoTracks()[0]?.getSettings().deviceId || deviceId);
+      setStatus("กล้องพร้อมแล้ว จัดภาพอาหารแล้วกดถ่ายภาพได้เลย");
+    } catch (error) {
+      stopCamera();
+      const message = error.name === "NotAllowedError"
+        ? "ไม่ได้รับอนุญาตใช้กล้อง กรุณาอนุญาตกล้องในการตั้งค่าเบราว์เซอร์หรือ macOS"
+        : error.name === "NotFoundError"
+          ? "ไม่พบกล้องที่ใช้งานได้ ลองเชื่อมต่อ iPhone ใหม่หรือเลือกกล้องอื่น"
+          : "เปิดกล้องไม่สำเร็จ กรุณาปิดแอปอื่นที่กำลังใช้กล้องแล้วลองอีกครั้ง";
+      setStatus(message, "error");
+    }
+  }
+
+  cameraButton.addEventListener("click", () => startCamera());
+  document.querySelector("#close-camera-button").addEventListener("click", () => {
+    stopCamera();
+    setStatus("ปิดกล้องแล้ว");
   });
+  cameraDevice.addEventListener("change", () => startCamera(cameraDevice.value));
+  document.querySelector("#capture-button").addEventListener("click", () => {
+    if (!cameraVideo.videoWidth || !cameraVideo.videoHeight) {
+      setStatus("กล้องยังเตรียมภาพไม่เสร็จ ลองอีกครั้งครับ", "error");
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = cameraVideo.videoWidth;
+    canvas.height = cameraVideo.videoHeight;
+    canvas.getContext("2d").drawImage(cameraVideo, 0, 0);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        setStatus("บันทึกภาพจากกล้องไม่สำเร็จ ลองอีกครั้งครับ", "error");
+        return;
+      }
+      const imageFile = new File([blob], `foodcal-${Date.now()}.jpg`, { type: "image/jpeg" });
+      stopCamera();
+      useFile(imageFile);
+    }, "image/jpeg", 0.92);
+  });
+  navigator.mediaDevices?.addEventListener("devicechange", () => {
+    if (cameraStream) refreshCameraDevices(cameraVideo.srcObject?.getVideoTracks()[0]?.getSettings().deviceId || "");
+  });
+  window.addEventListener("pagehide", stopCamera);
   input.addEventListener("change", () => useFile(input.files?.[0]));
 
   ["dragenter", "dragover"].forEach((eventName) => dropZone.addEventListener(eventName, (event) => {
@@ -244,27 +328,73 @@
     return new Intl.NumberFormat("th-TH", { maximumFractionDigits: digits }).format(value);
   }
 
+  function nutritionSourceLabel(source) {
+    if (source?.fdc_id) {
+      const dataset = source.data_type === "SR Legacy" ? "USDA SR Legacy (2018)" : "USDA FNDDS 2021–2023";
+      const match = source.match_quality === "approximate" ? `${dataset} · รายการใกล้เคียง` : dataset;
+      const sourceLink = source.source_item?.startsWith("https://fdc.nal.usda.gov/food-details/")
+        ? ` · <a href="${escapeHtml(source.source_item)}" target="_blank" rel="noopener noreferrer">ดูข้อมูล USDA ต้นทาง ↗</a>`
+        : "";
+      const referenceServing = source.reference_serving && source.reference_serving_g
+        ? ` · หน่วยอ้างอิง ${escapeHtml(source.reference_serving)} (${formatNumber(source.reference_serving_g)} กรัม)`
+        : "";
+      return `${match}: ${escapeHtml(source.fdc_description || "รายการอาหาร")} (FDC ${formatNumber(source.fdc_id)})${referenceServing}${sourceLink}`;
+    }
+    return "ค่าประมาณชั่วคราวที่ยังไม่ตรวจสอบ; ไม่มีรายการ USDA ที่จับคู่ได้";
+  }
+
+  function nutritionSourceSummary(source) {
+    if (!source?.fdc_id) return "ค่าประมาณชั่วคราว";
+    const dataset = source.data_type === "SR Legacy" ? "SR Legacy" : "FNDDS";
+    return `${source.match_quality === "approximate" ? `USDA ใกล้เคียง (${dataset})` : `USDA ${dataset}`} · FDC ${source.fdc_id}`;
+  }
+
   function renderNutrition(result) {
     const nutrition = result.nutrition;
+    const modelLabel = result.model_name || "Food-101";
+    const classCount = result.class_count || (result.model === "thfood50" ? 50 : 101);
+    document.querySelector("#model-result-label").textContent = `FOOD MATCH · ${modelLabel.toUpperCase()}`;
     document.querySelector("#food-name").textContent = result.food_name || result.predicted_label;
-    document.querySelector("#food-confidence").textContent = `ความมั่นใจของโมเดล ${formatNumber(result.confidence * 100)}%`;
+    document.querySelector("#food-confidence").textContent = `คะแนนอันดับ 1 ${formatNumber(result.confidence * 100, 1)}% · จาก ${classCount} คลาส`;
+    document.querySelector("#prediction-note").textContent = `คะแนนเป็น softmax score ไม่ใช่โอกาสถูกที่ผ่านการปรับเทียบ · ใช้ผลภายในโมเดล ${modelLabel} เท่านั้น`;
+    const predictions = result.top_predictions || [{
+      label: result.predicted_label,
+      food_name: result.food_name || result.predicted_label,
+      score: result.confidence,
+    }];
+    document.querySelector("#prediction-list").innerHTML = predictions.map((item, index) => `
+      <li class="prediction-row${index === 0 ? " is-leading" : ""}">
+        <span class="prediction-rank">${index + 1}</span>
+        <span class="prediction-name">${escapeHtml(item.food_name || item.label.replaceAll("_", " "))}</span>
+        <span class="prediction-score">${formatNumber(item.score * 100, 1)}%</span>
+        <span class="prediction-meter"><i style="width:${Math.min(100, item.score * 100)}%"></i></span>
+      </li>`).join("");
     document.querySelector("#calories-value").textContent = formatNumber(nutrition?.calories_kcal);
     document.querySelector("#protein-value").innerHTML = `${formatNumber(nutrition?.protein_g, 1)}<small> g</small>`;
     document.querySelector("#carbs-value").innerHTML = `${formatNumber(nutrition?.carbs_g, 1)}<small> g</small>`;
     document.querySelector("#fat-value").innerHTML = `${formatNumber(nutrition?.fat_g, 1)}<small> g</small>`;
-    document.querySelector("#nutrition-serving").textContent = nutrition
-      ? `ประมาณการสำหรับ ${formatNumber(result.servings_g)} กรัม · อ้างอิงข้อมูลต่อ 100 กรัม`
-      : "ยังไม่มีข้อมูลโภชนาการของอาหารชนิดนี้ในฐานข้อมูล";
+    const nutritionServing = document.querySelector("#nutrition-serving");
+    if (nutrition) {
+      const per100g = nutrition.calories_kcal * 100 / result.servings_g;
+      const macroNote = valuesHaveMacros(nutrition) ? "" : " · ยังไม่มีข้อมูลโปรตีน คาร์โบไฮเดรต และไขมัน";
+      nutritionServing.innerHTML = `คำนวณสำหรับ ${formatNumber(result.servings_g)} กรัม · ${formatNumber(per100g, 1)} kcal ต่อ 100 กรัม · สูตรจริงอาจต่างกัน${macroNote}<span class="nutrition-provenance">${nutritionSourceLabel(result.nutrition_source)}</span>`;
+    } else {
+      nutritionServing.textContent = "ยังไม่มีข้อมูลโภชนาการของอาหารชนิดนี้ในฐานข้อมูล";
+    }
     const values = [nutrition?.protein_g, nutrition?.carbs_g, nutrition?.fat_g];
     ["protein", "carbs", "fat"].forEach((name, index) => {
       const bar = document.querySelector(`#${name}-bar`);
-      bar.style.width = nutrition ? `${Math.min(100, (values[index] / 50) * 100)}%` : "0%";
+      bar.style.width = nutrition && values[index] != null ? `${Math.min(100, (values[index] / 50) * 100)}%` : "0%";
     });
     document.querySelector("#empty-result").hidden = true;
     document.querySelector("#result-content").hidden = false;
     document.querySelector("#result-badge").textContent = "วิเคราะห์แล้ว";
     document.querySelector("#result-badge").classList.add("ready");
     document.querySelector("#save-meal-button").disabled = !result.food_id || !nutrition;
+  }
+
+  function valuesHaveMacros(nutrition) {
+    return nutrition.protein_g !== null && nutrition.carbs_g !== null && nutrition.fat_g !== null;
   }
 
   analyzeButton.addEventListener("click", async () => {
@@ -277,13 +407,14 @@
     const body = new FormData();
     body.append("file", selectedFile);
     body.append("servings_g", String(serving));
+    body.append("model_name", classifierSelect.value);
     analyzeButton.disabled = true;
     analyzeButton.textContent = "กำลังวิเคราะห์…";
     setStatus("กำลังส่งภาพให้โมเดลวิเคราะห์ โปรดรอสักครู่");
     try {
       currentResult = await request("/api/predict", { method: "POST", body });
       renderNutrition(currentResult);
-      setStatus(currentResult.nutrition ? "ผลเป็นค่าประมาณจากโมเดลและฐานข้อมูลอาหาร" : "ไม่พบข้อมูลโภชนาการสำหรับคลาสนี้", currentResult.nutrition ? "success" : "");
+      setStatus(currentResult.nutrition ? "วิเคราะห์เสร็จแล้ว · ค่าแคลอรีเป็นค่าประมาณจากแหล่งข้อมูลที่แสดง" : "ไม่พบข้อมูลโภชนาการสำหรับคลาสนี้", currentResult.nutrition ? "success" : "");
     } catch (error) {
       setStatus(error.message, "error");
     } finally {
@@ -332,8 +463,8 @@
       list.innerHTML = meals.map((meal) => `
         <article class="history-row">
           <span class="history-thumb" aria-hidden="true">✿</span>
-          <div><div class="history-food">${escapeHtml(meal.food_name)}</div><div class="history-date">${new Date(meal.created_at).toLocaleString("th-TH")} · ${formatNumber(meal.servings_g)} กรัม</div></div>
-          <strong class="history-calories">${formatNumber(meal.calories_kcal)} <small>kcal</small></strong>
+          <div><div class="history-food">${escapeHtml(meal.food_name)}</div><div class="history-date">${new Date(meal.created_at).toLocaleString("th-TH")} · ${formatNumber(meal.servings_g)} กรัม · ${nutritionSourceSummary(meal.nutrition_source)}</div></div>
+          <strong class="history-calories">${formatNumber(meal.calories_kcal)} <small>kcal โดยประมาณ</small></strong>
           <button class="history-delete" type="button" data-delete-id="${meal.id}" aria-label="ลบรายการ ${escapeHtml(meal.food_name)}">×</button>
         </article>`).join("");
       list.querySelectorAll("[data-delete-id]").forEach((button) => button.addEventListener("click", async () => {

@@ -7,3 +7,4 @@ SQLAlchemy>=2.0,<3.0
 psycopg[binary]>=3.2
 argon2-cffi>=23.1
 PyJWT>=2.10,<3.0
+onnxruntime>=1.18,<2.0
